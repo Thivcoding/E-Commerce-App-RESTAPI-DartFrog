@@ -11,7 +11,9 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final controller = AuthController(createAuthService());
+  final controller = AuthController(
+    createAuthService(),
+  );
 
-  return controller.login(context);
+  return controller.resetPassword(context);
 }

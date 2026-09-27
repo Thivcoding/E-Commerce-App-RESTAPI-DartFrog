@@ -147,13 +147,18 @@ class UserRepository {
       email: document['email']?.toString() ?? '',
       password: document['password']?.toString() ?? '',
       role: document['role']?.toString() ?? 'USER',
+
       isActive: document['isActive'] == true,
-      createdAt: _parseDateTime(
-        document['createdAt'],
-      ),
-      updatedAt: _parseDateTime(
-        document['updatedAt'],
-      ),
+
+      isEmailVerified:
+          document['isEmailVerified'] == true,
+
+      emailVerifiedAt: document['emailVerifiedAt'] == null
+          ? null
+          : _parseDateTime(document['emailVerifiedAt']),
+
+      createdAt: _parseDateTime(document['createdAt']),
+      updatedAt: _parseDateTime(document['updatedAt']),
     );
   }
 

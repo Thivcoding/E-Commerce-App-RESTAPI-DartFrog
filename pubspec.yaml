@@ -8,9 +8,11 @@ environment:
 
 dependencies:
   bcrypt: ^1.2.0
+  crypto: ^3.0.7
   dart_frog: ^1.1.0
   dart_jsonwebtoken: ^3.4.1
   dotenv: ^4.2.0
+  mailer: ^7.2.0
   mongo_dart: ^0.10.9
 
 dev_dependencies:

@@ -2,11 +2,16 @@ import 'package:mongo_dart/mongo_dart.dart';
 
 class User {
   final ObjectId? id;
+
   final String name;
   final String email;
   final String password;
   final String role;
+
   final bool isActive;
+  final bool isEmailVerified;
+  final DateTime? emailVerifiedAt;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +22,8 @@ class User {
     required this.password,
     required this.role,
     required this.isActive,
+    this.isEmailVerified = false,
+    this.emailVerifiedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -29,6 +36,8 @@ class User {
       'password': password,
       'role': role,
       'isActive': isActive,
+      'isEmailVerified': isEmailVerified,
+      'emailVerifiedAt': emailVerifiedAt,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };

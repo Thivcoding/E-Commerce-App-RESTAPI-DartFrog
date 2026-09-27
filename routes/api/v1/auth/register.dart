@@ -1,14 +1,17 @@
 import 'package:dart_frog/dart_frog.dart';
 
-import 'package:ecommerce_api/config/database.dart';
 import 'package:ecommerce_api/controllers/auth_controller.dart';
-import 'package:ecommerce_api/repositories/user_repository.dart';
-import 'package:ecommerce_api/services/auth_service.dart';
+import 'package:ecommerce_api/utils/auth_service_factory.dart';
 
 Future<Response> onRequest(RequestContext context) async {
-  final repository = UserRepository(Database.db);
-  final service = AuthService(repository);
-  final controller = AuthController(service);
+  if (context.request.method != HttpMethod.post) {
+    return Response(
+      statusCode: 405,
+      body: 'Method Not Allowed',
+    );
+  }
+
+  final controller = AuthController(createAuthService());
 
   return controller.register(context);
 }
