@@ -2,7 +2,7 @@ import 'package:ecommerce_api/config/env.dart';
 import 'package:ecommerce_api/constants/role_constants.dart';
 import 'package:ecommerce_api/dto/request/auth/login_request.dart';
 import 'package:ecommerce_api/dto/request/auth/register_request.dart';
-import 'package:ecommerce_api/dto/response/user/user_response.dart';
+import 'package:ecommerce_api/dto/response/users/user_response.dart';
 import 'package:ecommerce_api/models/auth/email_verification_otp.dart';
 import 'package:ecommerce_api/models/auth/password_reset_otp.dart';
 import 'package:ecommerce_api/models/auth/password_reset_session.dart';
