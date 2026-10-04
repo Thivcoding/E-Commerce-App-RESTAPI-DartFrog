@@ -17,5 +17,7 @@ Future<Response> onRequest(
     createAuthService(),
   );
 
-  return controller.refresh(context);
+  return controller.googleLogin(
+    context,
+  );
 }

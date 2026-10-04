@@ -1,6 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 
-import '../models/authenticated_user.dart';
+import '../models/auth/authenticated_user.dart';
 import '../utils/jwt_util.dart';
 
 class AuthMiddleware {

@@ -1,12 +1,12 @@
 import 'package:mongo_dart/mongo_dart.dart';
 
-import '../models/password_reset_session.dart';
+import '../../models/auth/password_reset_session.dart';
 
 class PasswordResetSessionRepository {
   final DbCollection collection;
 
   PasswordResetSessionRepository(Db db)
-      : collection = db.collection('password_reset_sessions');
+    : collection = db.collection('password_reset_sessions');
 
   Future<void> create(
     PasswordResetSession session,

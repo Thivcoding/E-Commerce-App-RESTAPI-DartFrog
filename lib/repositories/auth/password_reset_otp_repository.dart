@@ -1,12 +1,12 @@
 import 'package:mongo_dart/mongo_dart.dart';
 
-import '../models/password_reset_otp.dart';
+import '../../models/auth/password_reset_otp.dart';
 
 class PasswordResetOtpRepository {
   final DbCollection collection;
 
   PasswordResetOtpRepository(Db db)
-      : collection = db.collection('password_reset_otps');
+    : collection = db.collection('password_reset_otps');
 
   Future<void> create(PasswordResetOtp otp) async {
     await collection.insertOne({

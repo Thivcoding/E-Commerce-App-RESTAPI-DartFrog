@@ -17,5 +17,5 @@ Future<Response> onRequest(
     createAuthService(),
   );
 
-  return controller.refresh(context);
+  return controller.logout(context);
 }

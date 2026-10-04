@@ -1,6 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 
-import '../utils/jwt_util.dart';
+import '../models/auth/authenticated_user.dart';
 
 class RoleMiddleware {
   static Middleware required(
@@ -8,36 +8,14 @@ class RoleMiddleware {
   ) {
     return (handler) {
       return (context) async {
-        final authorization = context.request.headers['authorization'];
-
-        if (authorization == null || !authorization.startsWith('Bearer ')) {
-          return Response.json(
-            statusCode: 401,
-            body: {
-              'success': false,
-              'message': 'Authorization token is required',
-            },
-          );
-        }
-
-        final token = authorization.substring(7).trim();
-
         try {
-          final payload = JwtUtil.verify(token);
+          final authenticatedUser = context.read<AuthenticatedUser>();
 
-          if (payload['type'] != 'access') {
-            return Response.json(
-              statusCode: 401,
-              body: {
-                'success': false,
-                'message': 'Invalid access token',
-              },
-            );
-          }
+          final userRole = authenticatedUser.role.toUpperCase();
 
-          final role = payload['role']?.toString();
+          final expectedRole = requiredRole.toUpperCase();
 
-          if (role != requiredRole) {
+          if (userRole != expectedRole) {
             return Response.json(
               statusCode: 403,
               body: {
@@ -53,7 +31,7 @@ class RoleMiddleware {
             statusCode: 401,
             body: {
               'success': false,
-              'message': 'Invalid or expired token',
+              'message': 'Authentication required',
             },
           );
         }

@@ -3,25 +3,31 @@ import 'package:dotenv/dotenv.dart';
 class Env {
   static late final String mongoUri;
   static late final String mongoDatabase;
+
   static late final String jwtSecret;
   static late final int jwtAccessExpires;
   static late final int jwtRefreshExpires;
-  static late String smtpHost;
-  static late int smtpPort;
-  static late String smtpUsername;
-  static late String smtpPassword;
 
-  static late String smtpFromEmail;
-  static late String smtpFromName;
+  static late final String smtpHost;
+  static late final int smtpPort;
+  static late final String smtpUsername;
+  static late final String smtpPassword;
 
-  static late String appBaseUrl;
-  static late int emailVerificationExpiresMinutes;
+  static late final String smtpFromEmail;
+  static late final String smtpFromName;
+
+  static late final String appBaseUrl;
+  static late final int emailVerificationExpiresMinutes;
+
+  static late final String googleClientId;
 
   static void load() {
     final env = DotEnv(includePlatformEnvironment: true)..load();
 
     mongoUri = env['MONGO_URI'] ?? '';
+
     mongoDatabase = env['MONGO_DATABASE'] ?? '';
+
     jwtSecret = env['JWT_SECRET'] ?? '';
 
     jwtAccessExpires =
@@ -37,36 +43,53 @@ class Env {
         604800;
 
     smtpHost = env['SMTP_HOST'] ?? '';
-    smtpPort = int.parse(
-      env['SMTP_PORT'] ?? '587',
-    );
+
+    smtpPort =
+        int.tryParse(
+          env['SMTP_PORT'] ?? '587',
+        ) ??
+        587;
 
     smtpUsername = env['SMTP_USERNAME'] ?? '';
+
     smtpPassword = env['SMTP_PASSWORD'] ?? '';
 
-    smtpFromEmail =
-        env['SMTP_FROM_EMAIL'] ?? '';
+    smtpFromEmail = env['SMTP_FROM_EMAIL'] ?? '';
 
-    smtpFromName =
-        env['SMTP_FROM_NAME'] ?? 'Ecommerce API';
+    smtpFromName = env['SMTP_FROM_NAME'] ?? 'Ecommerce API';
 
-    appBaseUrl =
-        env['APP_BASE_URL'] ?? 'http://localhost:8080';
+    appBaseUrl = env['APP_BASE_URL'] ?? 'http://localhost:8080';
 
-    emailVerificationExpiresMinutes = int.parse(
-      env['EMAIL_VERIFICATION_EXPIRES_MINUTES'] ?? '15',
-    );
+    emailVerificationExpiresMinutes =
+        int.tryParse(
+          env['EMAIL_VERIFICATION_EXPIRES_MINUTES'] ?? '15',
+        ) ??
+        15;
+
+    googleClientId = env['GOOGLE_CLIENT_ID'] ?? '';
 
     if (mongoUri.isEmpty) {
-      throw Exception('MONGO_URI is required');
+      throw Exception(
+        'MONGO_URI is required',
+      );
     }
 
     if (mongoDatabase.isEmpty) {
-      throw Exception('MONGO_DATABASE is required');
+      throw Exception(
+        'MONGO_DATABASE is required',
+      );
     }
 
     if (jwtSecret.isEmpty) {
-      throw Exception('JWT_SECRET is required');
+      throw Exception(
+        'JWT_SECRET is required',
+      );
+    }
+
+    if (googleClientId.isEmpty) {
+      throw Exception(
+        'GOOGLE_CLIENT_ID is required',
+      );
     }
   }
 }

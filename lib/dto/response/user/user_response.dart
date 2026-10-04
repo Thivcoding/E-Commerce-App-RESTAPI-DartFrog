@@ -1,4 +1,4 @@
-import '../../models/user.dart';
+import 'package:ecommerce_api/models/users/user.dart';
 
 class UserResponse {
   final String id;

@@ -1,44 +1,46 @@
 import 'package:ecommerce_api/config/env.dart';
 import 'package:ecommerce_api/constants/role_constants.dart';
-import 'package:ecommerce_api/dto/request/login_request.dart';
-import 'package:ecommerce_api/dto/request/register_request.dart';
-import 'package:ecommerce_api/dto/response/user_response.dart';
-import 'package:ecommerce_api/models/password_reset_session.dart';
-import 'package:ecommerce_api/models/user.dart';
-import 'package:ecommerce_api/models/email_verification_otp.dart';
-import 'package:ecommerce_api/repositories/email_verification_otp_repository.dart';
+import 'package:ecommerce_api/dto/request/auth/login_request.dart';
+import 'package:ecommerce_api/dto/request/auth/register_request.dart';
+import 'package:ecommerce_api/dto/response/user/user_response.dart';
+import 'package:ecommerce_api/models/auth/email_verification_otp.dart';
+import 'package:ecommerce_api/models/auth/password_reset_otp.dart';
+import 'package:ecommerce_api/models/auth/password_reset_session.dart';
+import 'package:ecommerce_api/models/auth/refresh_token_session.dart';
+import 'package:ecommerce_api/models/users/user.dart';
+import 'package:ecommerce_api/repositories/auth/email_verification_otp_repository.dart';
+import 'package:ecommerce_api/repositories/auth/password_reset_otp_repository.dart';
+import 'package:ecommerce_api/repositories/auth/password_reset_session_repository.dart';
+import 'package:ecommerce_api/repositories/auth/refresh_token_session_repository.dart';
 import 'package:ecommerce_api/repositories/user_repository.dart';
 import 'package:ecommerce_api/services/email_service.dart';
+import 'package:ecommerce_api/services/google_auth_service.dart';
+import 'package:ecommerce_api/utils/jwt_util.dart';
 import 'package:ecommerce_api/utils/otp_hash_util.dart';
 import 'package:ecommerce_api/utils/otp_util.dart';
-import 'package:ecommerce_api/utils/jwt_util.dart';
+import 'package:ecommerce_api/utils/password_reset_token_util.dart';
 import 'package:ecommerce_api/utils/password_util.dart';
-import 'package:mongo_dart/mongo_dart.dart';
-import 'package:ecommerce_api/models/password_reset_otp.dart';
-import 'package:ecommerce_api/repositories/password_reset_otp_repository.dart';
-import 'package:ecommerce_api/utils/password_reset_token_util.dart';
-import 'package:ecommerce_api/repositories/password_reset_session_repository.dart';
-import 'package:ecommerce_api/utils/password_reset_token_util.dart';
 import 'package:ecommerce_api/utils/token_hash_util.dart';
-
+import 'package:mongo_dart/mongo_dart.dart';
 
 class AuthService {
   final UserRepository repository;
   final EmailVerificationOtpRepository otpRepository;
   final PasswordResetOtpRepository passwordResetOtpRepository;
   final PasswordResetSessionRepository passwordResetSessionRepository;
+  final RefreshTokenSessionRepository refreshTokenSessionRepository;
   final EmailService emailService;
+  final GoogleAuthService googleAuthService;
 
   AuthService(
     this.repository,
     this.otpRepository,
     this.passwordResetOtpRepository,
     this.passwordResetSessionRepository,
+    this.refreshTokenSessionRepository,
     this.emailService,
+    this.googleAuthService,
   );
-  // =========================================================
-  // REGISTER
-  // =========================================================
 
   Future<UserResponse> register(
     RegisterRequest request,
@@ -82,6 +84,8 @@ class AuthService {
       email: email,
       password: PasswordUtil.hash(password),
       role: RoleConstants.user,
+      provider: 'LOCAL',
+      providerId: null,
       isActive: true,
       isEmailVerified: false,
       emailVerifiedAt: null,
@@ -91,15 +95,10 @@ class AuthService {
 
     final createdUser = await repository.create(user);
 
-    // Send 6-digit OTP
     await _sendVerificationOtp(createdUser);
 
     return UserResponse.fromUser(createdUser);
   }
-
-  // =========================================================
-  // LOGIN
-  // =========================================================
 
   Future<Map<String, dynamic>> login(
     LoginRequest request,
@@ -131,17 +130,140 @@ class AuthService {
       );
     }
 
-    final passwordValid = PasswordUtil.verify(
-      password,
-      user.password,
-    );
+    if (user.password == null || user.password!.isEmpty) {
+      if (user.provider.toUpperCase() == 'GOOGLE') {
+        throw Exception(
+          'This account uses Google login',
+        );
+      }
 
-    if (!passwordValid) {
       throw Exception(
-        'Invalid email or password',
+        'Password is not configured for this account',
       );
     }
 
+    final passwordValid = PasswordUtil.verify(
+      password,
+      user.password!,
+    );
+
+    if (!passwordValid) {
+      throw Exception('Invalid email or password');
+    }
+
+    return _createLoginTokens(user);
+  }
+
+  Future<Map<String, dynamic>> googleLogin(
+    String idToken,
+  ) async {
+    final normalizedToken = idToken.trim();
+
+    if (normalizedToken.isEmpty) {
+      throw Exception(
+        'Google ID token is required',
+      );
+    }
+
+    final googleUser = await googleAuthService.verifyIdToken(
+      normalizedToken,
+    );
+
+    final providerId = googleUser['providerId']?.toString();
+
+    final email = googleUser['email']?.toString().trim().toLowerCase();
+
+    final name = googleUser['name']?.toString().trim();
+
+    if (providerId == null || providerId.isEmpty) {
+      throw Exception(
+        'Google user ID is missing',
+      );
+    }
+
+    if (email == null || email.isEmpty) {
+      throw Exception(
+        'Google email is missing',
+      );
+    }
+
+    if (name == null || name.isEmpty) {
+      throw Exception(
+        'Google user name is missing',
+      );
+    }
+
+    User? user = await repository.findByProviderId(
+      'GOOGLE',
+      providerId,
+    );
+
+    if (user == null) {
+      user = await repository.findByEmail(email);
+    }
+
+    final now = DateTime.now();
+
+    if (user == null) {
+      user = await repository.create(
+        User(
+          name: name,
+          email: email,
+          password: null,
+          role: RoleConstants.user,
+          provider: 'GOOGLE',
+          providerId: providerId,
+          isActive: true,
+          isEmailVerified: true,
+          emailVerifiedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    } else {
+      if (!user.isActive) {
+        throw Exception(
+          'User account is inactive',
+        );
+      }
+
+      final isGoogleAccount = user.provider.toUpperCase() == 'GOOGLE';
+
+      final sameGoogleUser = user.providerId == providerId;
+
+      if (!isGoogleAccount || !sameGoogleUser) {
+        if (user.id == null) {
+          throw Exception(
+            'User ID is missing',
+          );
+        }
+
+        final updatedUser = await repository.updateById(
+          user.id!.oid,
+          {
+            'provider': 'GOOGLE',
+            'providerId': providerId,
+            'isEmailVerified': true,
+            'emailVerifiedAt': user.emailVerifiedAt ?? now,
+          },
+        );
+
+        if (updatedUser == null) {
+          throw Exception(
+            'Failed to update user',
+          );
+        }
+
+        user = updatedUser;
+      }
+    }
+
+    return _createLoginTokens(user);
+  }
+
+  Future<Map<String, dynamic>> _createLoginTokens(
+    User user,
+  ) async {
     if (user.id == null) {
       throw Exception('User ID is missing');
     }
@@ -158,16 +280,30 @@ class AuthService {
       userId: userId,
     );
 
+    final refreshTokenHash = TokenHashUtil.hash(refreshToken);
+
+    final refreshExpiresAt = DateTime.now().add(
+      Duration(
+        seconds: Env.jwtRefreshExpires,
+      ),
+    );
+
+    await refreshTokenSessionRepository.create(
+      RefreshTokenSession(
+        userId: user.id!,
+        tokenHash: refreshTokenHash,
+        expiresAt: refreshExpiresAt,
+        revokedAt: null,
+        createdAt: DateTime.now(),
+      ),
+    );
+
     return {
       'user': UserResponse.fromUser(user).toJson(),
       'accessToken': accessToken,
       'refreshToken': refreshToken,
     };
   }
-
-  // =========================================================
-  // GET ME
-  // =========================================================
 
   Future<UserResponse> getMe(
     String userId,
@@ -190,10 +326,6 @@ class AuthService {
 
     return UserResponse.fromUser(user);
   }
-
-  // =========================================================
-  // CHANGE PASSWORD
-  // =========================================================
 
   Future<void> changePassword(
     String userId,
@@ -224,9 +356,27 @@ class AuthService {
       throw Exception('User not found');
     }
 
+    if (!user.isActive) {
+      throw Exception(
+        'User account is inactive',
+      );
+    }
+
+    if (user.password == null || user.password!.isEmpty) {
+      if (user.provider.toUpperCase() == 'GOOGLE') {
+        throw Exception(
+          'Google accounts cannot change password using this endpoint',
+        );
+      }
+
+      throw Exception(
+        'Password is not configured for this account',
+      );
+    }
+
     final valid = PasswordUtil.verify(
       currentPassword,
-      user.password,
+      user.password!,
     );
 
     if (!valid) {
@@ -235,31 +385,27 @@ class AuthService {
       );
     }
 
-    final hashedPassword = PasswordUtil.hash(
-      newPassword,
-    );
+    final hashedPassword = PasswordUtil.hash(newPassword);
 
     await repository.updateById(
       userId,
       {
         'password': hashedPassword,
+        'provider': 'LOCAL',
+        'providerId': null,
       },
     );
-  }
 
-  // =========================================================
-  // EMAIL VALIDATION
-  // =========================================================
+    if (user.id != null) {
+      await refreshTokenSessionRepository.revokeAllByUserId(user.id!);
+    }
+  }
 
   bool _isValidEmail(String email) {
     return RegExp(
       r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
     ).hasMatch(email);
   }
-
-  // =========================================================
-  // SEND 6-DIGIT OTP
-  // =========================================================
 
   Future<void> _sendVerificationOtp(
     User user,
@@ -274,25 +420,20 @@ class AuthService {
       );
     }
 
-    // Generate 6-digit OTP
     final otp = OtpUtil.generate6DigitOtp();
 
-    // Hash OTP before saving
     final otpHash = OtpHashUtil.hash(otp);
 
-    // Expiration time
     final expiresAt = DateTime.now().add(
       Duration(
         minutes: Env.emailVerificationExpiresMinutes,
       ),
     );
 
-    // Remove previous OTP
     await otpRepository.deleteByUserId(
       user.id!,
     );
 
-    // Save new OTP
     await otpRepository.create(
       EmailVerificationOtp(
         userId: user.id!,
@@ -305,7 +446,6 @@ class AuthService {
       ),
     );
 
-    // Send OTP to email
     await emailService.sendVerificationOtp(
       toEmail: user.email,
       name: user.name,
@@ -313,68 +453,77 @@ class AuthService {
     );
   }
 
-  // =========================================================
-  // VERIFY EMAIL WITH OTP
-  // =========================================================
-
   Future<void> verifyEmail({
-  required String email,
-  required String otp,
+    required String email,
+    required String otp,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
+
     final normalizedOtp = otp.trim();
 
     if (normalizedEmail.isEmpty) {
-      throw Exception('Email is required');
+      throw Exception(
+        'Email is required',
+      );
     }
 
     if (!_isValidEmail(normalizedEmail)) {
-      throw Exception('Invalid email address');
+      throw Exception(
+        'Invalid email address',
+      );
     }
 
     if (!RegExp(r'^\d{6}$').hasMatch(normalizedOtp)) {
-      throw Exception('OTP must be 6 digits');
+      throw Exception(
+        'OTP must be 6 digits',
+      );
     }
 
-    final user = await repository.findByEmail(normalizedEmail);
+    final user = await repository.findByEmail(
+      normalizedEmail,
+    );
 
     if (user == null) {
-      throw Exception('Invalid or expired OTP');
+      throw Exception(
+        'Invalid or expired OTP',
+      );
     }
 
     if (!user.isActive) {
-      throw Exception('User account is inactive');
+      throw Exception(
+        'User account is inactive',
+      );
     }
 
     if (user.isEmailVerified) {
-      throw Exception('Email is already verified');
+      throw Exception(
+        'Email is already verified',
+      );
     }
 
     if (user.id == null) {
-      throw Exception('User ID is missing');
+      throw Exception(
+        'User ID is missing',
+      );
     }
-
-    // -------------------------------------------------
-    // Find active OTP
-    // -------------------------------------------------
 
     final otpDocument = await otpRepository.findActiveOtp(
       userId: user.id!,
     );
 
     if (otpDocument == null) {
-      throw Exception('Invalid or expired OTP');
+      throw Exception(
+        'Invalid or expired OTP',
+      );
     }
 
     final rawOtpId = otpDocument['_id'];
 
     if (rawOtpId is! ObjectId) {
-      throw Exception('Invalid verification OTP');
+      throw Exception(
+        'Invalid verification OTP',
+      );
     }
-
-    // -------------------------------------------------
-    // Check attempts
-    // -------------------------------------------------
 
     final attempts = otpDocument['attempts'] as int? ?? 0;
 
@@ -386,20 +535,16 @@ class AuthService {
       );
     }
 
-    // -------------------------------------------------
-    // Hash submitted OTP
-    // -------------------------------------------------
-
-    final otpHash = OtpHashUtil.hash(normalizedOtp);
+    final otpHash = OtpHashUtil.hash(
+      normalizedOtp,
+    );
 
     final savedOtpHash = otpDocument['otpHash']?.toString();
 
-    // -------------------------------------------------
-    // Compare OTP
-    // -------------------------------------------------
-
     if (savedOtpHash != otpHash) {
-      await otpRepository.incrementAttempts(rawOtpId);
+      await otpRepository.incrementAttempts(
+        rawOtpId,
+      );
 
       final currentAttempt = attempts + 1;
 
@@ -414,38 +559,25 @@ class AuthService {
       );
     }
 
-    // -------------------------------------------------
-    // OTP correct
-    // -------------------------------------------------
-
-    await otpRepository.markUsed(rawOtpId);
-
-    // -------------------------------------------------
-    // Verify user email
-    // -------------------------------------------------
+    await otpRepository.markUsed(
+      rawOtpId,
+    );
 
     await repository.updateById(
       user.id!.oid,
       {
         'isEmailVerified': true,
         'emailVerifiedAt': DateTime.now(),
-        'updatedAt': DateTime.now(),
       },
     );
   }
 
-  // =========================================================
-  // RESEND VERIFICATION OTP
-  // =========================================================
-
   Future<void> resendVerification(
     String email,
   ) async {
-    final normalizedEmail =
-        email.trim().toLowerCase();
+    final normalizedEmail = email.trim().toLowerCase();
 
-    if (normalizedEmail.isEmpty ||
-        !_isValidEmail(normalizedEmail)) {
+    if (normalizedEmail.isEmpty || !_isValidEmail(normalizedEmail)) {
       throw Exception(
         'Invalid email address',
       );
@@ -455,36 +587,47 @@ class AuthService {
       normalizedEmail,
     );
 
-    // Do not reveal whether account exists
-    if (user == null ||
-        user.isEmailVerified ||
-        !user.isActive) {
+    if (user == null || user.isEmailVerified || !user.isActive) {
       return;
     }
 
-    // Generate and send a new OTP
     await _sendVerificationOtp(user);
   }
 
-  Future<void> forgotPassword(String email) async {
+  Future<void> forgotPassword(
+    String email,
+  ) async {
     final normalizedEmail = email.trim().toLowerCase();
 
     if (normalizedEmail.isEmpty) {
-      throw Exception('Email is required');
+      throw Exception(
+        'Email is required',
+      );
     }
 
     if (!_isValidEmail(normalizedEmail)) {
-      throw Exception('Invalid email address');
+      throw Exception(
+        'Invalid email address',
+      );
     }
 
-    final user = await repository.findByEmail(normalizedEmail);
+    final user = await repository.findByEmail(
+      normalizedEmail,
+    );
 
-    // Do not reveal whether the email exists.
     if (user == null || !user.isActive) {
       return;
     }
 
     if (user.id == null) {
+      return;
+    }
+
+    if (user.password == null || user.password!.isEmpty) {
+      if (user.provider.toUpperCase() == 'GOOGLE') {
+        return;
+      }
+
       return;
     }
 
@@ -521,24 +664,30 @@ class AuthService {
     );
   }
 
-
   Future<String> verifyPasswordResetOtp({
     required String email,
     required String otp,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
+
     final normalizedOtp = otp.trim();
 
     if (normalizedEmail.isEmpty) {
-      throw Exception('Email is required');
+      throw Exception(
+        'Email is required',
+      );
     }
 
     if (!_isValidEmail(normalizedEmail)) {
-      throw Exception('Invalid email address');
+      throw Exception(
+        'Invalid email address',
+      );
     }
 
     if (!RegExp(r'^\d{6}$').hasMatch(normalizedOtp)) {
-      throw Exception('OTP must be 6 digits');
+      throw Exception(
+        'OTP must be 6 digits',
+      );
     }
 
     final user = await repository.findByEmail(
@@ -546,30 +695,42 @@ class AuthService {
     );
 
     if (user == null || user.id == null) {
-      throw Exception('Invalid or expired OTP');
+      throw Exception(
+        'Invalid or expired OTP',
+      );
     }
 
     if (!user.isActive) {
-      throw Exception('Invalid or expired OTP');
+      throw Exception(
+        'Invalid or expired OTP',
+      );
     }
 
-    final otpDocument =
-        await passwordResetOtpRepository.findActiveOtp(
+    if (user.password == null || user.password!.isEmpty) {
+      throw Exception(
+        'This account does not use password login',
+      );
+    }
+
+    final otpDocument = await passwordResetOtpRepository.findActiveOtp(
       userId: user.id!,
     );
 
     if (otpDocument == null) {
-      throw Exception('Invalid or expired OTP');
+      throw Exception(
+        'Invalid or expired OTP',
+      );
     }
 
     final rawOtpId = otpDocument['_id'];
 
     if (rawOtpId is! ObjectId) {
-      throw Exception('Invalid reset OTP');
+      throw Exception(
+        'Invalid reset OTP',
+      );
     }
 
-    final attempts =
-        otpDocument['attempts'] as int? ?? 0;
+    final attempts = otpDocument['attempts'] as int? ?? 0;
 
     const maxAttempts = 5;
 
@@ -583,8 +744,7 @@ class AuthService {
       normalizedOtp,
     );
 
-    final savedOtpHash =
-        otpDocument['otpHash']?.toString();
+    final savedOtpHash = otpDocument['otpHash']?.toString();
 
     if (savedOtpHash != otpHash) {
       await passwordResetOtpRepository.incrementAttempts(
@@ -600,29 +760,20 @@ class AuthService {
       }
 
       throw Exception(
-        'Invalid OTP. Attempt '
-        '$currentAttempt of $maxAttempts.',
+        'Invalid OTP. Attempt $currentAttempt of $maxAttempts.',
       );
     }
 
-    // =====================================================
-    // OTP IS CORRECT
-    // =====================================================
+    final resetToken = PasswordResetTokenUtil.generate();
 
-    // 1. Generate raw reset token
-    final resetToken =
-        PasswordResetTokenUtil.generate();
+    final tokenHash = TokenHashUtil.hash(
+      resetToken,
+    );
 
-    // 2. Hash reset token
-    final tokenHash =
-        TokenHashUtil.hash(resetToken);
-
-    // 3. Expire old reset sessions
     await passwordResetSessionRepository.deleteByUserId(
       user.id!,
     );
 
-    // 4. Create new reset session
     final expiresAt = DateTime.now().add(
       const Duration(minutes: 10),
     );
@@ -638,49 +789,44 @@ class AuthService {
       ),
     );
 
-    // 5. Mark OTP as used
     await passwordResetOtpRepository.markUsed(
       rawOtpId,
     );
 
-    // 6. Return RAW token to client
     return resetToken;
   }
 
   Future<void> resetPassword({
-  required String email,
-  required String resetToken,
-  required String newPassword,
+    required String email,
+    required String resetToken,
+    required String newPassword,
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
+
     final normalizedToken = resetToken.trim();
 
-    // =====================================================
-    // 1. Validate email
-    // =====================================================
-
     if (normalizedEmail.isEmpty) {
-      throw Exception('Email is required');
+      throw Exception(
+        'Email is required',
+      );
     }
 
     if (!_isValidEmail(normalizedEmail)) {
-      throw Exception('Invalid email address');
+      throw Exception(
+        'Invalid email address',
+      );
     }
-
-    // =====================================================
-    // 2. Validate reset token
-    // =====================================================
 
     if (normalizedToken.isEmpty) {
-      throw Exception('Reset token is required');
+      throw Exception(
+        'Reset token is required',
+      );
     }
 
-    // =====================================================
-    // 3. Validate new password
-    // =====================================================
-
     if (newPassword.isEmpty) {
-      throw Exception('New password is required');
+      throw Exception(
+        'New password is required',
+      );
     }
 
     if (newPassword.length < 8) {
@@ -689,86 +835,253 @@ class AuthService {
       );
     }
 
-    // =====================================================
-    // 4. Find user
-    // =====================================================
-
     final user = await repository.findByEmail(
       normalizedEmail,
     );
 
     if (user == null) {
-      throw Exception('Invalid or expired reset token');
+      throw Exception(
+        'Invalid or expired reset token',
+      );
     }
 
     if (user.id == null) {
-      throw Exception('User ID is missing');
+      throw Exception(
+        'User ID is missing',
+      );
     }
 
     if (!user.isActive) {
-      throw Exception('User account is inactive');
+      throw Exception(
+        'User account is inactive',
+      );
     }
 
-    // =====================================================
-    // 5. Hash reset token
-    // =====================================================
+    if (user.password == null || user.password!.isEmpty) {
+      throw Exception(
+        'This account does not use password login',
+      );
+    }
 
     final tokenHash = TokenHashUtil.hash(
       normalizedToken,
     );
 
-    // =====================================================
-    // 6. Find valid reset session
-    // =====================================================
-
-    final session =
-        await passwordResetSessionRepository.findValidSession(
+    final session = await passwordResetSessionRepository.findValidSession(
       userId: user.id!,
       tokenHash: tokenHash,
     );
 
     if (session == null) {
-      throw Exception('Invalid or expired reset token');
+      throw Exception(
+        'Invalid or expired reset token',
+      );
     }
-
-    // =====================================================
-    // 7. Get session ID
-    // =====================================================
 
     final rawSessionId = session['_id'];
 
     if (rawSessionId is! ObjectId) {
-      throw Exception('Invalid reset session');
+      throw Exception(
+        'Invalid reset session',
+      );
     }
-
-    // =====================================================
-    // 8. Hash new password
-    // =====================================================
 
     final hashedPassword = PasswordUtil.hash(
       newPassword,
     );
 
-    // =====================================================
-    // 9. Update user password
-    // =====================================================
-
     await repository.updateById(
       user.id!.oid,
       {
         'password': hashedPassword,
-        'updatedAt': DateTime.now(),
+        'provider': 'LOCAL',
+        'providerId': null,
       },
     );
-
-    // =====================================================
-    // 10. Mark reset session as used
-    // =====================================================
 
     await passwordResetSessionRepository.markUsed(
       rawSessionId,
     );
+
+    await refreshTokenSessionRepository.revokeAllByUserId(
+      user.id!,
+    );
   }
 
-}
+  Future<Map<String, dynamic>> refresh(
+    String refreshToken,
+  ) async {
+    final normalizedToken = refreshToken.trim();
 
+    if (normalizedToken.isEmpty) {
+      throw Exception(
+        'Refresh token is required',
+      );
+    }
+
+    final payload = JwtUtil.verify(
+      normalizedToken,
+    );
+
+    final tokenType = payload['type']?.toString();
+
+    if (tokenType != 'refresh') {
+      throw Exception(
+        'Invalid refresh token',
+      );
+    }
+
+    final rawUserId = payload['userId']?.toString();
+
+    if (rawUserId == null || rawUserId.isEmpty) {
+      throw Exception(
+        'Invalid refresh token',
+      );
+    }
+
+    final userId = ObjectId.fromHexString(
+      rawUserId,
+    );
+
+    final user = await repository.findById(
+      userId.oid,
+    );
+
+    if (user == null) {
+      throw Exception(
+        'User not found',
+      );
+    }
+
+    if (!user.isActive) {
+      throw Exception(
+        'User account is inactive',
+      );
+    }
+
+    final tokenHash = TokenHashUtil.hash(
+      normalizedToken,
+    );
+
+    final session = await refreshTokenSessionRepository.findValidSession(
+      userId: userId,
+      tokenHash: tokenHash,
+    );
+
+    if (session == null) {
+      throw Exception(
+        'Invalid or expired refresh token',
+      );
+    }
+
+    final rawSessionId = session['_id'];
+
+    if (rawSessionId is! ObjectId) {
+      throw Exception(
+        'Invalid refresh session',
+      );
+    }
+
+    await refreshTokenSessionRepository.revokeSession(
+      rawSessionId,
+    );
+
+    final newAccessToken = JwtUtil.generateAccessToken(
+      userId: user.id!.oid,
+      email: user.email,
+      role: user.role,
+    );
+
+    final newRefreshToken = JwtUtil.generateRefreshToken(
+      userId: user.id!.oid,
+    );
+
+    final newRefreshTokenHash = TokenHashUtil.hash(
+      newRefreshToken,
+    );
+
+    final refreshExpiresAt = DateTime.now().add(
+      Duration(
+        seconds: Env.jwtRefreshExpires,
+      ),
+    );
+
+    await refreshTokenSessionRepository.create(
+      RefreshTokenSession(
+        userId: user.id!,
+        tokenHash: newRefreshTokenHash,
+        expiresAt: refreshExpiresAt,
+        revokedAt: null,
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    return {
+      'accessToken': newAccessToken,
+      'refreshToken': newRefreshToken,
+    };
+  }
+
+  Future<void> logout(
+    String refreshToken,
+  ) async {
+    final normalizedToken = refreshToken.trim();
+
+    if (normalizedToken.isEmpty) {
+      throw Exception(
+        'Refresh token is required',
+      );
+    }
+
+    final payload = JwtUtil.verify(
+      normalizedToken,
+    );
+
+    final tokenType = payload['type']?.toString();
+
+    if (tokenType != 'refresh') {
+      throw Exception(
+        'Invalid refresh token',
+      );
+    }
+
+    final rawUserId = payload['userId']?.toString();
+
+    if (rawUserId == null || rawUserId.isEmpty) {
+      throw Exception(
+        'Invalid refresh token',
+      );
+    }
+
+    final userId = ObjectId.fromHexString(
+      rawUserId,
+    );
+
+    final tokenHash = TokenHashUtil.hash(
+      normalizedToken,
+    );
+
+    final session = await refreshTokenSessionRepository.findValidSession(
+      userId: userId,
+      tokenHash: tokenHash,
+    );
+
+    if (session == null) {
+      throw Exception(
+        'Invalid or expired refresh token',
+      );
+    }
+
+    final rawSessionId = session['_id'];
+
+    if (rawSessionId is! ObjectId) {
+      throw Exception(
+        'Invalid refresh session',
+      );
+    }
+
+    await refreshTokenSessionRepository.revokeSession(
+      rawSessionId,
+    );
+  }
+}

@@ -1,6 +1,6 @@
 import 'package:mongo_dart/mongo_dart.dart';
 
-import '../models/user.dart';
+import '../models/users/user.dart';
 
 class UserRepository {
   final Db db;
@@ -11,7 +11,9 @@ class UserRepository {
     return db.collection('users');
   }
 
-  Future<User?> findByEmail(String email) async {
+  Future<User?> findByEmail(
+    String email,
+  ) async {
     final document = await collection.findOne(
       where.eq(
         'email',
@@ -26,7 +28,9 @@ class UserRepository {
     return _fromDocument(document);
   }
 
-  Future<User?> findById(String id) async {
+  Future<User?> findById(
+    String id,
+  ) async {
     final objectId = ObjectId.parse(id);
 
     final document = await collection.findOne(
@@ -40,7 +44,24 @@ class UserRepository {
     return _fromDocument(document);
   }
 
-  Future<User> create(User user) async {
+  Future<User?> findByProviderId(
+    String provider,
+    String providerId,
+  ) async {
+    final document = await collection.findOne(
+      where.eq('provider', provider).eq('providerId', providerId),
+    );
+
+    if (document == null) {
+      return null;
+    }
+
+    return _fromDocument(document);
+  }
+
+  Future<User> create(
+    User user,
+  ) async {
     final document = user.toDocument();
 
     final result = await collection.insertOne(document);
@@ -48,7 +69,9 @@ class UserRepository {
     final insertedId = result.id;
 
     if (insertedId is! ObjectId) {
-      throw Exception('Failed to create user');
+      throw Exception(
+        'Failed to create user',
+      );
     }
 
     final createdUser = await collection.findOne(
@@ -56,7 +79,9 @@ class UserRepository {
     );
 
     if (createdUser == null) {
-      throw Exception('Failed to retrieve created user');
+      throw Exception(
+        'Failed to retrieve created user',
+      );
     }
 
     return _fromDocument(createdUser);
@@ -74,7 +99,10 @@ class UserRepository {
 
     await collection.updateOne(
       where.eq('_id', objectId),
-      modify.set('updatedAt', updateData['updatedAt']),
+      modify.set(
+        'updatedAt',
+        updateData['updatedAt'],
+      ),
     );
 
     for (final entry in updateData.entries) {
@@ -84,7 +112,10 @@ class UserRepository {
 
       await collection.updateOne(
         where.eq('_id', objectId),
-        modify.set(entry.key, entry.value),
+        modify.set(
+          entry.key,
+          entry.value,
+        ),
       );
     }
 
@@ -99,7 +130,9 @@ class UserRepository {
     return _fromDocument(document);
   }
 
-  Future<bool> deleteById(String id) async {
+  Future<bool> deleteById(
+    String id,
+  ) async {
     final objectId = ObjectId.parse(id);
 
     final existing = await collection.findOne(
@@ -117,7 +150,9 @@ class UserRepository {
     return true;
   }
 
-  Future<bool> existsByEmail(String email) async {
+  Future<bool> existsByEmail(
+    String email,
+  ) async {
     final document = await collection.findOne(
       where.eq(
         'email',
@@ -128,7 +163,9 @@ class UserRepository {
     return document != null;
   }
 
-  User _fromDocument(Map<String, dynamic> document) {
+  User _fromDocument(
+    Map<String, dynamic> document,
+  ) {
     final rawId = document['_id'];
 
     ObjectId? id;
@@ -145,24 +182,29 @@ class UserRepository {
       id: id,
       name: document['name']?.toString() ?? '',
       email: document['email']?.toString() ?? '',
-      password: document['password']?.toString() ?? '',
+      password: document['password']?.toString(),
       role: document['role']?.toString() ?? 'USER',
-
+      provider: document['provider']?.toString() ?? 'LOCAL',
+      providerId: document['providerId']?.toString(),
       isActive: document['isActive'] == true,
-
-      isEmailVerified:
-          document['isEmailVerified'] == true,
-
+      isEmailVerified: document['isEmailVerified'] == true,
       emailVerifiedAt: document['emailVerifiedAt'] == null
           ? null
-          : _parseDateTime(document['emailVerifiedAt']),
-
-      createdAt: _parseDateTime(document['createdAt']),
-      updatedAt: _parseDateTime(document['updatedAt']),
+          : _parseDateTime(
+              document['emailVerifiedAt'],
+            ),
+      createdAt: _parseDateTime(
+        document['createdAt'],
+      ),
+      updatedAt: _parseDateTime(
+        document['updatedAt'],
+      ),
     );
   }
 
-  DateTime _parseDateTime(dynamic value) {
+  DateTime _parseDateTime(
+    dynamic value,
+  ) {
     if (value is DateTime) {
       return value;
     }

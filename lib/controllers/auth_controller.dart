@@ -1,22 +1,21 @@
 import 'package:dart_frog/dart_frog.dart';
 
-import 'package:ecommerce_api/dto/request/forgot_password_request.dart';
-import 'package:ecommerce_api/dto/request/login_request.dart';
-import 'package:ecommerce_api/dto/request/register_request.dart';
-import 'package:ecommerce_api/dto/request/reset_password_request.dart';
-import 'package:ecommerce_api/dto/request/verify_email_request.dart';
-import 'package:ecommerce_api/dto/request/verify_reset_otp_request.dart';
+import 'package:ecommerce_api/dto/request/auth/forgot_password_request.dart';
+import 'package:ecommerce_api/dto/request/auth/login_request.dart';
+import 'package:ecommerce_api/dto/request/auth/logout_request.dart';
+import 'package:ecommerce_api/dto/request/auth/refresh_token_request.dart';
+import 'package:ecommerce_api/dto/request/auth/register_request.dart';
+import 'package:ecommerce_api/dto/request/auth/reset_password_request.dart';
+import 'package:ecommerce_api/dto/request/auth/verify_email_request.dart';
+import 'package:ecommerce_api/dto/request/auth/verify_reset_otp_request.dart';
 import 'package:ecommerce_api/services/auth_service.dart';
 import 'package:ecommerce_api/utils/response_util.dart';
+import 'package:ecommerce_api/dto/request/auth/google_login_request.dart';
 
 class AuthController {
   final AuthService authService;
 
   AuthController(this.authService);
-
-  // =========================================================
-  // REGISTER
-  // =========================================================
 
   Future<Response> register(
     RequestContext context,
@@ -53,10 +52,6 @@ class AuthController {
     }
   }
 
-  // =========================================================
-  // LOGIN
-  // =========================================================
-
   Future<Response> login(
     RequestContext context,
   ) async {
@@ -90,10 +85,6 @@ class AuthController {
       );
     }
   }
-
-  // =========================================================
-  // VERIFY EMAIL WITH OTP
-  // =========================================================
 
   Future<Response> verifyEmail(
     RequestContext context,
@@ -132,10 +123,6 @@ class AuthController {
     }
   }
 
-  // =========================================================
-  // GET ME
-  // =========================================================
-
   Future<Response> me(
     RequestContext context,
     String userId,
@@ -157,10 +144,6 @@ class AuthController {
       );
     }
   }
-
-  // =========================================================
-  // RESEND VERIFICATION OTP
-  // =========================================================
 
   Future<Response> resendVerification(
     RequestContext context,
@@ -198,10 +181,6 @@ class AuthController {
     }
   }
 
-  // =========================================================
-  // FORGOT PASSWORD
-  // =========================================================
-
   Future<Response> forgotPassword(
     RequestContext context,
   ) async {
@@ -224,8 +203,7 @@ class AuthController {
       );
 
       return ResponseUtil.success(
-        message:
-            'If the email exists, a password reset OTP has been sent.',
+        message: 'If the email exists, a password reset OTP has been sent.',
         data: null,
       );
     } catch (e) {
@@ -238,10 +216,6 @@ class AuthController {
       );
     }
   }
-
-  // =========================================================
-  // VERIFY PASSWORD RESET OTP
-  // =========================================================
 
   Future<Response> verifyResetOtp(
     RequestContext context,
@@ -260,8 +234,7 @@ class AuthController {
         Map<String, dynamic>.from(body),
       );
 
-      final resetToken =
-          await authService.verifyPasswordResetOtp(
+      final resetToken = await authService.verifyPasswordResetOtp(
         email: request.email,
         otp: request.otp,
       );
@@ -282,10 +255,6 @@ class AuthController {
       );
     }
   }
-
-  // =========================================================
-  // RESET PASSWORD
-  // =========================================================
 
   Future<Response> resetPassword(
     RequestContext context,
@@ -321,6 +290,116 @@ class AuthController {
           '',
         ),
         statusCode: 400,
+      );
+    }
+  }
+
+  Future<Response> refresh(
+    RequestContext context,
+  ) async {
+    try {
+      final body = await context.request.json();
+
+      if (body is! Map) {
+        return ResponseUtil.error(
+          message: 'Invalid request body',
+          statusCode: 400,
+        );
+      }
+
+      final request = RefreshTokenRequest.fromJson(
+        Map<String, dynamic>.from(body),
+      );
+
+      final result = await authService.refresh(
+        request.refreshToken,
+      );
+
+      return ResponseUtil.success(
+        message: 'Token refreshed successfully',
+        data: result,
+      );
+    } catch (e) {
+      return ResponseUtil.error(
+        message: e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+        statusCode: 401,
+      );
+    }
+  }
+
+  Future<Response> logout(
+    RequestContext context,
+  ) async {
+    try {
+      final body = await context.request.json();
+
+      if (body is! Map) {
+        return ResponseUtil.error(
+          message: 'Invalid request body',
+          statusCode: 400,
+        );
+      }
+
+      final request = LogoutRequest.fromJson(
+        Map<String, dynamic>.from(body),
+      );
+
+      await authService.logout(
+        request.refreshToken,
+      );
+
+      return ResponseUtil.success(
+        message: 'Logout successful',
+        data: null,
+      );
+    } catch (e) {
+      return ResponseUtil.error(
+        message: e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+        statusCode: 401,
+      );
+    }
+  }
+
+  Future<Response> googleLogin(
+    RequestContext context,
+  ) async {
+    try {
+      final body = await context.request.json();
+
+      if (body is! Map) {
+        return ResponseUtil.error(
+          message: 'Invalid request body',
+          statusCode: 400,
+        );
+      }
+
+      final request = GoogleLoginRequest.fromJson(
+        Map<String, dynamic>.from(
+          body,
+        ),
+      );
+
+      final result = await authService.googleLogin(
+        request.idToken,
+      );
+
+      return ResponseUtil.success(
+        message: 'Google login successful',
+        data: result,
+      );
+    } catch (e) {
+      return ResponseUtil.error(
+        message: e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+        statusCode: 401,
       );
     }
   }
