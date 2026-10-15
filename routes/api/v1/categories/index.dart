@@ -21,7 +21,7 @@ Future<Response> onRequest(
     case HttpMethod.post:
       return AuthMiddleware.required()(
         RoleMiddleware.required(
-          'USER',
+          'ADMIN',
         )(
           controller.create,
         ),

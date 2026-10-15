@@ -1,6 +1,8 @@
 import 'package:dotenv/dotenv.dart';
 
 class Env {
+  static bool _loaded = false;
+
   static late final String mongoUri;
   static late final String mongoDatabase;
 
@@ -22,6 +24,10 @@ class Env {
   static late final String googleClientId;
 
   static void load() {
+    if (_loaded) {
+      return;
+    }
+
     final env = DotEnv(includePlatformEnvironment: true)..load();
 
     mongoUri = env['MONGO_URI'] ?? '';
@@ -91,5 +97,7 @@ class Env {
         'GOOGLE_CLIENT_ID is required',
       );
     }
+
+    _loaded = true;
   }
 }
