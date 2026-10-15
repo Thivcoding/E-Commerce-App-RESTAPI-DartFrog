@@ -1,14 +1,17 @@
 import 'package:dart_frog/dart_frog.dart';
 
-import 'package:ecommerce_api/middleware/auth_middleware.dart';
-import 'package:ecommerce_api/middleware/role_middleware.dart';
+import 'package:ecommerce_api/config/database.dart';
+import 'package:ecommerce_api/config/env.dart';
 
 Handler middleware(
   Handler handler,
 ) {
-  return AuthMiddleware.required()(
-    RoleMiddleware.required('USER')(
-      handler,
-    ),
-  );
+  return (context) async {
+    if (!Database.isConnected) {
+      Env.load();
+      await Database.connect();
+    }
+
+    return handler(context);
+  };
 }

@@ -23,7 +23,7 @@ Future<Response> onRequest(
     case HttpMethod.put:
       return AuthMiddleware.required()(
         RoleMiddleware.required(
-          'ADMIN',
+          'USER',
         )(
           (context) => controller.update(
             context,
@@ -35,7 +35,7 @@ Future<Response> onRequest(
     case HttpMethod.delete:
       return AuthMiddleware.required()(
         RoleMiddleware.required(
-          'ADMIN',
+          'USER',
         )(
           (context) => controller.delete(
             context,
