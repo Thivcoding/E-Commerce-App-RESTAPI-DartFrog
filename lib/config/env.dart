@@ -23,6 +23,14 @@ class Env {
 
   static late final String googleClientId;
 
+  static late String bakongToken;
+  static late String bakongAccountId;
+  static late String bakongBaseUrl;
+  static late String bakongMerchantName;
+  static late String bakongMerchantId;
+  static late String bakongAcquiringBank;
+  static late String bakongMerchantCity;
+
   static void load() {
     if (_loaded) {
       return;
@@ -73,6 +81,14 @@ class Env {
         15;
 
     googleClientId = env['GOOGLE_CLIENT_ID'] ?? '';
+
+    bakongToken = env['BAKONG_TOKEN'] ?? '';
+    bakongAccountId = env['BAKONG_ACCOUNT_ID'] ?? '';
+    bakongBaseUrl = env['BAKONG_BASE_URL'] ?? 'https://api-bakong.nbc.gov.kh';
+    bakongMerchantName = env['BAKONG_MERCHANT_NAME'] ?? '';
+    bakongMerchantId = env['BAKONG_MERCHANT_ID'] ?? '';
+    bakongAcquiringBank = env['BAKONG_ACQUIRING_BANK'] ?? '';
+    bakongMerchantCity = env['BAKONG_MERCHANT_CITY'] ?? 'Phnom Penh';
 
     if (mongoUri.isEmpty) {
       throw Exception(

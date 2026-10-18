@@ -45,6 +45,10 @@ class OrderService {
     double totalAmount = 0;
 
     for (final cartItem in cartItems) {
+      if (cartItem.quantity <= 0) {
+        throw Exception('Product quantity must be greater than zero');
+      }
+
       final product = await products.findOne(
         where.eq('_id', cartItem.productId),
       );
@@ -56,8 +60,12 @@ class OrderService {
       final price = (product['price'] as num?)?.toDouble();
       final stock = (product['stock'] as num?)?.toInt() ?? 0;
 
-      if (price == null || price < 0) {
+      if (price == null || !price.isFinite || price <= 0) {
         throw Exception('Product price is invalid');
+      }
+
+      if (stock < 0) {
+        throw Exception('Product stock is invalid');
       }
 
       if (cartItem.quantity > stock) {
