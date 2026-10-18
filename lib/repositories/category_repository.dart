@@ -7,10 +7,6 @@ class CategoryRepository {
 
   CategoryRepository(Db db) : collection = db.collection('categories');
 
-  // =====================================================
-  // CREATE
-  // =====================================================
-
   Future<Category> create(
     Category category,
   ) async {
@@ -42,10 +38,6 @@ class CategoryRepository {
     );
   }
 
-  // =====================================================
-  // FIND ALL
-  // =====================================================
-
   Future<List<Category>> findAll() async {
     final documents = await collection
         .find(
@@ -58,10 +50,6 @@ class CategoryRepository {
 
     return documents.map(_fromDocument).toList();
   }
-
-  // =====================================================
-  // FIND ACTIVE
-  // =====================================================
 
   Future<List<Category>> findActive() async {
     final documents = await collection
@@ -78,10 +66,6 @@ class CategoryRepository {
     return documents.map(_fromDocument).toList();
   }
 
-  // =====================================================
-  // FIND BY ID
-  // =====================================================
-
   Future<Category?> findById(
     ObjectId id,
   ) async {
@@ -95,10 +79,6 @@ class CategoryRepository {
 
     return _fromDocument(document);
   }
-
-  // =====================================================
-  // FIND BY NAME
-  // =====================================================
 
   Future<Category?> findByName(
     String name,
@@ -116,10 +96,6 @@ class CategoryRepository {
 
     return _fromDocument(document);
   }
-
-  // =====================================================
-  // UPDATE
-  // =====================================================
 
   Future<Category?> update(
     ObjectId id,
@@ -149,10 +125,6 @@ class CategoryRepository {
     return findById(id);
   }
 
-  // =====================================================
-  // DELETE
-  // =====================================================
-
   Future<bool> delete(
     ObjectId id,
   ) async {
@@ -162,10 +134,6 @@ class CategoryRepository {
 
     return result.nRemoved > 0;
   }
-
-  // =====================================================
-  // DOCUMENT → MODEL
-  // =====================================================
 
   Category _fromDocument(
     Map<String, dynamic> document,
@@ -182,10 +150,6 @@ class CategoryRepository {
     );
   }
 
-  // =====================================================
-  // OBJECT ID
-  // =====================================================
-
   ObjectId? _parseObjectId(
     dynamic value,
   ) {
@@ -201,10 +165,6 @@ class CategoryRepository {
       value.toString(),
     );
   }
-
-  // =====================================================
-  // DATETIME
-  // =====================================================
 
   DateTime _parseDateTime(
     dynamic value,

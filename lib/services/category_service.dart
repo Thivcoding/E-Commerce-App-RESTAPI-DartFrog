@@ -13,10 +13,6 @@ class CategoryService {
     this.repository,
   );
 
-  // =====================================================
-  // CREATE
-  // =====================================================
-
   Future<CategoryResponse> create(
     CreateCategoryRequest request,
   ) async {
@@ -60,10 +56,6 @@ class CategoryService {
     );
   }
 
-  // =====================================================
-  // GET ALL
-  // =====================================================
-
   Future<List<CategoryResponse>> findAll() async {
     final categories = await repository.findAll();
 
@@ -74,10 +66,6 @@ class CategoryService {
         .toList();
   }
 
-  // =====================================================
-  // GET ACTIVE
-  // =====================================================
-
   Future<List<CategoryResponse>> findActive() async {
     final categories = await repository.findActive();
 
@@ -87,10 +75,6 @@ class CategoryService {
         )
         .toList();
   }
-
-  // =====================================================
-  // GET BY ID
-  // =====================================================
 
   Future<CategoryResponse> findById(
     String id,
@@ -111,10 +95,6 @@ class CategoryService {
       category,
     );
   }
-
-  // =====================================================
-  // UPDATE
-  // =====================================================
 
   Future<CategoryResponse> update(
     String id,
@@ -175,10 +155,6 @@ class CategoryService {
     );
   }
 
-  // =====================================================
-  // DELETE
-  // =====================================================
-
   Future<void> delete(
     String id,
   ) async {
@@ -204,10 +180,6 @@ class CategoryService {
       );
     }
   }
-
-  // =====================================================
-  // PARSE OBJECT ID
-  // =====================================================
 
   ObjectId _parseObjectId(
     String id,

@@ -12,10 +12,6 @@ class CategoryController {
     this.service,
   );
 
-  // =====================================================
-  // CREATE
-  // =====================================================
-
   Future<Response> create(
     RequestContext context,
   ) async {
@@ -52,10 +48,6 @@ class CategoryController {
     }
   }
 
-  // =====================================================
-  // GET ALL
-  // =====================================================
-
   Future<Response> findAll(
     RequestContext context,
   ) async {
@@ -77,10 +69,6 @@ class CategoryController {
       );
     }
   }
-
-  // =====================================================
-  // GET ACTIVE
-  // =====================================================
 
   Future<Response> findActive(
     RequestContext context,
@@ -104,10 +92,6 @@ class CategoryController {
     }
   }
 
-  // =====================================================
-  // GET BY ID
-  // =====================================================
-
   Future<Response> findById(
     RequestContext context,
     String id,
@@ -126,10 +110,6 @@ class CategoryController {
       );
     }
   }
-
-  // =====================================================
-  // UPDATE
-  // =====================================================
 
   Future<Response> update(
     RequestContext context,
@@ -168,10 +148,6 @@ class CategoryController {
     }
   }
 
-  // =====================================================
-  // DELETE
-  // =====================================================
-
   Future<Response> delete(
     RequestContext context,
     String id,
@@ -189,10 +165,6 @@ class CategoryController {
       );
     }
   }
-
-  // =====================================================
-  // ERROR
-  // =====================================================
 
   String _cleanError(
     Object error,

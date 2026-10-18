@@ -8,8 +8,6 @@ class Database {
 
   static bool get isConnected => _db?.isConnected ?? false;
 
-  /// Reuse the existing connection.
-  /// Concurrent requests share the same connection attempt.
   static Future<void> connect() async {
     if (isConnected) {
       return;
