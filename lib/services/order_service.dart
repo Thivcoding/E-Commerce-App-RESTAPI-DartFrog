@@ -100,7 +100,7 @@ class OrderService {
       paymentStatus: 'UNPAID',
       paymentMethod: request.paymentMethod,
       totalAmount: totalAmount,
-      currency: 'USD',
+      currency: 'KHR',
       createdAt: now,
       updatedAt: now,
     );
